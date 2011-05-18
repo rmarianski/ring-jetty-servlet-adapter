@@ -1,0 +1,13 @@
+# ring-jetty-servlet-adapter
+
+Generate a ring adapter using jetty servlet context. This can be useful since it exposes actual servlets, which can more closely simulate production environments.
+
+## Usage
+
+(run-jetty ring-handler {:port 3000 :join? false})
+
+## License
+
+Copyright (C) 2011 Robert Marianski
+
+Distributed under the Eclipse Public License, the same as Clojure.
