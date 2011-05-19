@@ -1,6 +1,6 @@
 # ring-jetty-servlet-adapter
 
-Generate a ring adapter using jetty servlet context. This can be useful since it exposes actual servlets, which can more closely simulate production environments.
+The main difference between this jetty adapter and the one included in ring is that this one adds a reference to a servlet to the request map. It does this by using a different jetty handler, namely the servlet context one. This can be useful because since a servlet is exposed, the development environment can more closely simulate a production environment in some scenarios. And this may possibly reduce or even eliminate the need to have separate middleware chains for development and production.
 
 ## Usage
 
