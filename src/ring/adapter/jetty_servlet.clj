@@ -34,7 +34,7 @@
   "Construct a Jetty Server instance."
   [options]
   (let [connector (doto (SocketConnector.)
-                    (.setPort (options :port 80))
+                    (.setPort (options :port 8080))
                     (.setHost (options :host)))
         server    (doto (Server.)
                     (.addConnector connector)
