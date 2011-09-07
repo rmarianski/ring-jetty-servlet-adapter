@@ -1,6 +1,26 @@
 # ring-jetty-servlet-adapter
 
-The main difference between this jetty adapter and the one included in ring is that this one adds a reference to a servlet to the request map. It does this by using a different jetty handler, namely the servlet context one. This can be useful because since a servlet is exposed, the development environment can more closely simulate a production environment in some scenarios. And this may possibly reduce or even eliminate the need to have separate middleware chains for development and production.
+The main difference between this jetty adapter and the one included in
+ring is the addition of additional servlet specific information to the
+request map. It relies on ring.util.servlet to dynamically generate a
+servlet, whose implementation adds servlet specific keys to the
+request map. This servlet then gets used to create the jetty handler.
+
+Specifically, the following new keys are available:
+
+* :servlet
+* :servlet-request
+* :servlet-response
+* :servlet-context
+
+Additionally, the run-jetty function supports an option to generate a
+custom jetty handler. This can be useful if any custom configuration
+is required.
+
+:make-jetty-handler
+
+This should be a function that accepts a single argument, the ring
+handler, and returns a jetty Handler.
 
 ## Usage
 
