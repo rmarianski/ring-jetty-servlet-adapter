@@ -24,6 +24,8 @@
       (.setPort        (options :ssl-port 443))
       (.setKeystore    (options :keystore))
       (.setKeyPassword (options :key-password)))
+    (when (options :keystore-type)
+      (.setKeystoreType ssl-connector (options :keystore-type)))
     (when (options :truststore)
       (.setTruststore ssl-connector (options :truststore)))
     (when (options :trust-password)
