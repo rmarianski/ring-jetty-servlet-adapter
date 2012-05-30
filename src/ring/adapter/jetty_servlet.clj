@@ -1,73 +1,92 @@
 (ns ring.adapter.jetty-servlet
-  (:import [org.mortbay.jetty Server Request Response Handler]
-           [org.mortbay.jetty.bio SocketConnector]
-           [org.mortbay.jetty.security SslSocketConnector]
-           [org.mortbay.jetty.servlet Context ServletHolder]
-           [javax.servlet.http HttpServletRequest HttpServletResponse])
+  (:import (org.eclipse.jetty.server Server Request)
+           (org.eclipse.jetty.server.handler AbstractHandler)
+           (org.eclipse.jetty.server.nio SelectChannelConnector)
+           (org.eclipse.jetty.server.ssl SslSelectChannelConnector)
+           (org.eclipse.jetty.servlet ServletContextHandler ServletHolder)
+           (org.eclipse.jetty.util.thread QueuedThreadPool)
+           (org.eclipse.jetty.util.ssl SslContextFactory)
+           (javax.servlet.http HttpServletRequest HttpServletResponse))
   (:use [ring.util.servlet :only (servlet)]))
 
 (defn make-jetty-handler
-  ([handler] (make-jetty-handler handler Context/SESSIONS))
+  ([handler] (make-jetty-handler handler ServletContextHandler/SESSIONS))
   ([handler options]
-     (doto (Context. options)
+     (doto (ServletContextHandler. options)
        (.setContextPath "/")
        (.addServlet (-> handler
                         servlet
                         (ServletHolder.))
                     "/"))))
 
-(defn add-ssl-connector!
-  "Add an SslSocketConnector to a Jetty Server instance."
-  [^Server server options]
-  (let [ssl-connector (SslSocketConnector.)]
-    (doto ssl-connector
-      (.setPort        (options :ssl-port 443))
-      (.setKeystore    (options :keystore))
-      (.setKeyPassword (options :key-password)))
+(defn- ssl-context-factory
+  "Creates a new SslContextFactory instance from a map of options."
+  [options]
+  (let [context (SslContextFactory.)]
+    (if (string? (options :keystore))
+      (.setKeyStorePath context (options :keystore))
+      (.setKeyStore context (options :keystore)))
+    (.setKeyStorePassword context (options :key-password))
     (when (options :keystore-type)
-      (.setKeystoreType ssl-connector (options :keystore-type)))
+      (.setKeystoreType context (options :keystore-type)))
     (when (options :truststore)
-      (.setTruststore ssl-connector (options :truststore)))
+      (.setTrustStore context (options :truststore)))
     (when (options :trust-password)
-      (.setTrustPassword ssl-connector (options :trust-password)))
-    (.addConnector server ssl-connector)))
+      (.setTrustPassword context (options :trust-password)))
+    (case (options :client-auth)
+      :need (.setNeedClientAuth context true)
+      :want (.setWantClientAuth context true)
+      nil)
+    context))
 
-(defn create-server
+(defn- ssl-connector
+  "Creates a SslSelectChannelConnector instance."
+  [options]
+  (doto (SslSelectChannelConnector. (ssl-context-factory options))
+    (.setPort (options :ssl-port 443))
+    (.setHost (options :host))))
+
+(defn- create-server
   "Construct a Jetty Server instance."
   [options]
-  (let [connector (doto (SocketConnector.)
-                    (.setPort (options :port 8080))
+  (let [connector (doto (SelectChannelConnector.)
+                    (.setPort (options :port 80))
                     (.setHost (options :host)))
         server    (doto (Server.)
                     (.addConnector connector)
                     (.setSendDateHeader true))]
     (when (or (options :ssl?) (options :ssl-port))
-      (add-ssl-connector! server options))
+      (.addConnector server (ssl-connector options)))
     server))
 
 (defn ^Server run-jetty
-  "Serve the given handler according to the options.
-  Options:
-    :configurator        - A function called with the Server instance.
-    :port
-    :host
-    :join?               - Block the caller: defaults to true.
-    :make-jetty-handler  - Function used to generate jetty handler
-    :ssl?                - Use SSL.
-    :ssl-port            - SSL port: defaults to 443, implies :ssl?
-    :keystore
-    :key-password
-    :truststore
-    :trust-password"
+  "Start a Jetty webserver to serve the given handler according to the
+  supplied options:
+
+  :configurator - a function called with the Jetty Server instance
+  :port         - the port to listen on (defaults to 80)
+  :host         - the hostname to listen on
+  :join?        - blocks the thread until server ends (defaults to true)
+  :make-jetty-handler - Function used to generate jetty handler
+  :ssl?         - allow connections over HTTPS
+  :ssl-port     - the SSL port to listen on (defaults to 443, implies :ssl?)
+  :keystore     - the keystore to use for SSL connections
+  :keystore-type - the keystore stype to use for SSL connections
+  :key-password - the password to the keystore
+  :truststore   - a truststore to use for SSL connections
+  :trust-password - the password to the truststore
+  :max-threads  - the maximum number of threads to use (default 50)
+  :client-auth  - SSL client certificate authenticate, may be set to :need,
+                  :want or :none (defaults to :none)"
   [handler options]
   (let [^Server s (create-server (dissoc options :configurator))]
+    (doto s
+      (.setHandler ((options :make-jetty-handler make-jetty-handler)
+                    handler))
+      (.setThreadPool (QueuedThreadPool. (options :max-threads 50))))
     (when-let [configurator (:configurator options)]
       (configurator s))
-    (doto s
-      (.setHandler
-       (^Handler (:make-jetty-handler options make-jetty-handler)
-                 handler))
-      (.start))
+    (.start s)
     (when (:join? options false)
       (.join s))
     s))
