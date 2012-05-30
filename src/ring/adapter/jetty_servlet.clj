@@ -6,6 +6,8 @@
            (org.eclipse.jetty.servlet ServletContextHandler ServletHolder)
            (org.eclipse.jetty.util.thread QueuedThreadPool)
            (org.eclipse.jetty.util.ssl SslContextFactory)
+           (java.security KeyStore)
+           (javax.servlet Servlet)
            (javax.servlet.http HttpServletRequest HttpServletResponse))
   (:use [ring.util.servlet :only (servlet)]))
 
@@ -14,9 +16,7 @@
   ([handler options]
      (doto (ServletContextHandler. options)
        (.setContextPath "/")
-       (.addServlet (-> handler
-                        servlet
-                        (ServletHolder.))
+       (.addServlet (ServletHolder. ^Servlet (servlet handler))
                     "/"))))
 
 (defn- ssl-context-factory
@@ -25,14 +25,16 @@
   (let [context (SslContextFactory.)]
     (if (string? (options :keystore))
       (.setKeyStorePath context (options :keystore))
-      (.setKeyStore context (options :keystore)))
+      (.setKeyStore
+       context ^KeyStore (options :keystore)))
     (.setKeyStorePassword context (options :key-password))
     (when (options :keystore-type)
-      (.setKeystoreType context (options :keystore-type)))
+      (.setKeyStoreType context ^String (options :keystore-type)))
     (when (options :truststore)
-      (.setTrustStore context (options :truststore)))
+      (.setTrustStore
+       context ^KeyStore (options :truststore)))
     (when (options :trust-password)
-      (.setTrustPassword context (options :trust-password)))
+      (.setTrustStorePassword context ^String (options :trust-password)))
     (case (options :client-auth)
       :need (.setNeedClientAuth context true)
       :want (.setWantClientAuth context true)
@@ -83,7 +85,7 @@
     (doto s
       (.setHandler ((options :make-jetty-handler make-jetty-handler)
                     handler))
-      (.setThreadPool (QueuedThreadPool. (options :max-threads 50))))
+      (.setThreadPool (QueuedThreadPool. ^Integer (options :max-threads 50))))
     (when-let [configurator (:configurator options)]
       (configurator s))
     (.start s)
