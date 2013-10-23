@@ -1,7 +1,7 @@
 (ns ring.adapter.jetty-servlet-test
-  (:use [ring.adapter.jetty-servlet]
-        [clojure.test])
-  (:require [clj-http.client :as http]))
+  (:require [clojure.test :refer :all]
+            [ring.adapter.jetty-servlet :refer [run-jetty make-jetty-handler]]
+            [clj-http.client :as http]))
 
 (defn- hello-world [request]
   {:status  200
